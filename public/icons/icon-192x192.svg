@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="192" height="192">
+  <rect width="512" height="512" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#f59e0b" stroke-width="6" opacity="0.15"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#f59e0b" stroke-width="4" opacity="0.1"/>
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#f59e0b" stroke-width="2" opacity="0.08"/>
+  <!-- Islamic star pattern -->
+  <polygon points="256,100 276,200 370,170 300,230 340,320 256,260 172,320 212,230 142,170 236,200" fill="#f59e0b" opacity="0.12"/>
+  <!-- App name -->
+  <text x="256" y="240" text-anchor="middle" fill="#f59e0b" font-size="72" font-family="serif" font-weight="700">رحاب</text>
+  <text x="256" y="330" text-anchor="middle" fill="#fbbf24" font-size="72" font-family="serif" font-weight="700">الله</text>
+  <!-- Decorative dots -->
+  <circle cx="256" cy="380" r="4" fill="#f59e0b" opacity="0.4"/>
+  <circle cx="236" cy="385" r="2" fill="#f59e0b" opacity="0.3"/>
+  <circle cx="276" cy="385" r="2" fill="#f59e0b" opacity="0.3"/>
+</svg>
