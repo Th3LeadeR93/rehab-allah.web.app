@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.2.4",
+  "versionCode": 6,
+  "versionName": "1.2.3",
   "apkUrl": "https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.2.3/rehab-allah-v1.2.3.apk",
   "changelog": "إصلاح موضع المشغل وزر المساعد الروحي، واستقرار شريط الأذان واللمس.",
   "forceUpdate": false
