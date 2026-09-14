@@ -1,9 +1,10 @@
 {
-  "versionCode": 23,
-  "versionName": "1.4.1",
-  "version": "1.4.1",
-  "apkUrl": "https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.4.1/rehab-allah-v1.4.1.apk",
-  "changelog": "تحديث تجريبي 1.4.1 • اختبار منظومة التحديث التلقائي والمحرك المحلي",
-  "releaseNotes": "تحديث تجريبي 1.4.1 • اختبار منظومة التحديث التلقائي والمحرك المحلي",
-  "forceUpdate": false
+  "versionCode": 24,
+  "versionName": "1.5.0",
+  "version": "1.5.0",
+  "apkUrl": "https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.0/rehab-allah-v1.5.0.apk",
+  "changelog": "إطلاق ميزة واحة رمضان المبارك • محرك العمل بدون إنترنت والمصحف الشريف وتحسينات عامة",
+  "releaseNotes": "إطلاق ميزة واحة رمضان المبارك • محرك العمل بدون إنترنت والمصحف الشريف وتحسينات عامة",
+  "forceUpdate": false,
+  "hijriOffset": 0
 }
