@@ -1,7 +1,9 @@
 {
-  "versionCode": 8,
-  "versionName": "1.3.1",
-  "apkUrl": "https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.3.1/rehab-allah-v1.3.1.apk",
-  "changelog": "إصلاح تتابع صفحات المصحف وتزامن السور، زر الرجوع، كتم الأذان لكل صلاة، مؤقت النوم وتذكيرات الجمعة.",
+  "versionCode": 23,
+  "versionName": "1.4.1",
+  "version": "1.4.1",
+  "apkUrl": "https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.4.1/rehab-allah-v1.4.1.apk",
+  "changelog": "تحديث تجريبي 1.4.1 • اختبار منظومة التحديث التلقائي والمحرك المحلي",
+  "releaseNotes": "تحديث تجريبي 1.4.1 • اختبار منظومة التحديث التلقائي والمحرك المحلي",
   "forceUpdate": false
 }
