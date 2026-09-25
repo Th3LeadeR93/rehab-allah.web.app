@@ -1,28 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useAppStore, type Reciter } from "../store/useAppStore";
 import { FAMOUS_RECITERS_ORDERED } from "../data/famousReciters";
 import { ISLAMIC_RADIOS, type RadioStation } from "../data/radios";
 import PrayerTimesWidget from "./PrayerTimesWidget";
 
 /* ── Safe Arabic string constants (zero-literal approach) ── */
-const PWA_INSTALLED_TEXT =
-  "✨ تطبيق رحاب الله مثبت ومتاح على جهازكم الآن. نفعنا الله وإياكم به.";
-
-const DESKTOP_PWA_TEXT =
-  "💡 تطبيق رحاب الله متاح كتطبيق ويب تقدمي (PWA) فائق السرعة والخفة يعمل بتوافق كامل على الحواسيب والهواتف الذكية مع إمكانية العمل دون انقطاع.";
-
-const PWA_INSTALL_TITLE =
-  "تثبيت تطبيق رحاب الله الرسمي (PWA)";
-
-const PWA_INSTALL_SUBTITLE =
-  "اضغط هنا لتثبيت التطبيق مباشرة على جهازك والوصول السريع دون متصفح";
-
-const PWA_BOTTOM_TITLE =
-  "تثبيت التطبيق على الشاشة الرئيسية";
-
-const PWA_BOTTOM_SUBTITLE =
-  "أضف التطبيق إلى شاشتك الرئيسية للوصول السريع في أي وقت";
-
 const CAIRO_RADIO_TITLE =
   "\u0625\u0630\u0627\u0639\u0629 \u0627\u0644\u0642\u0631\u0622\u0646 \u0627\u0644\u0643\u0631\u064A\u0645 \u0645\u0646 \u0627\u0644\u0642\u0627\u0647\u0631\u0629";
 
@@ -113,38 +95,7 @@ export default function HomePage() {
   const isPlaying = useAppStore((s) => s.isPlaying);
   const queue = useAppStore((s) => s.queue);
 
-  // ── PWA State & Actions ──
-  const deferredPrompt = useAppStore((s) => s.deferredPrompt);
-  const isPwaInstallable = useAppStore((s) => s.isPwaInstallable);
-  const setPwaPrompt = useAppStore((s) => s.setPwaPrompt);
-  const triggerPwaInstall = useAppStore((s) => s.triggerPwaInstall);
-
-  const [isBannerDismissed, setIsBannerDismissed] = useState(() => {
-    try {
-      return localStorage.getItem("rehab_pwa_banner_dismissed") === "true";
-    } catch {
-      return false;
-    }
-  });
-
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  /* ── PWA beforeinstallprompt lifecycle (attached securely on mount) ── */
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setPwaPrompt(e as any, true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
-    };
-  }, [setPwaPrompt]);
-
-  /* ── Derived state ── */
-  const canInstallPwa = isPwaInstallable && deferredPrompt !== null;
 
   const famousReciters = useMemo(() => {
     if (reciters.length === 0) return [];
@@ -208,77 +159,47 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* ══════════════════════════════════════════════════════════
-          TOP WIDE PWA BUTTON — Strict Conditional Swap
-          IF canInstallPwa: show install button with blinking dot
-          ELSE: show glassmorphic "installed" confirmation box
-      ══════════════════════════════════════════════════════════ */}
-      {canInstallPwa ? (
-        <button
-          onClick={() => triggerPwaInstall()}
-          className="w-full relative overflow-hidden rounded-2xl transition-all duration-500 group"
-        >
-          <div className="absolute inset-0 bg-gradient-to-l from-emerald-600/20 via-green-600/15 to-emerald-600/20" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-          <div className="relative backdrop-blur-sm border border-emerald-500/20 hover:border-emerald-500/40 rounded-2xl p-4 md:p-5">
-            <div className="flex items-center justify-center gap-3 md:gap-4">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-emerald-500/40 blur-xl rounded-full animate-ping" />
-                <div className="relative w-3 h-3 md:w-4 md:h-4 rounded-full bg-emerald-400 border-2 border-emerald-200/50 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
+      {/* ── Featured Direct Android APK Download Card ────────────── */}
+      <a
+        href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.6/rehab-allah-v1.5.6.apk"
+        target="_blank"
+        rel="noopener noreferrer"
+        download="rehab-allah-v1.5.6.apk"
+        className="w-full relative overflow-hidden rounded-2xl transition-all duration-300 group block shadow-lg shadow-black/40"
+        aria-label="تحميل تطبيق الأندرويد المباشر (Android APK)"
+      >
+        <div className="absolute inset-0 bg-[#0d1420]/95 border border-amber-500/30 group-hover:border-amber-400/60 rounded-2xl transition-colors" />
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-emerald-500/10 to-transparent pointer-events-none" />
+        <div className="relative p-4 md:p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 md:gap-4">
+            <div className="relative flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-[#121d2f] to-[#0a101b] border border-amber-500/30 flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
+                <svg className="w-7 h-7 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.411 13.8564 8 12 8s-3.5902.411-5.1368.9497L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/>
+                </svg>
               </div>
-              <div className="text-center">
-                <p className="text-lg md:text-xl font-bold font-amiri text-emerald-300">
-                  {PWA_INSTALL_TITLE}
-                </p>
-                <p className="text-xs text-emerald-200/60 mt-0.5">
-                  {PWA_INSTALL_SUBTITLE}
-                </p>
-              </div>
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+              </span>
+            </div>
+            <div className="text-right">
+              <p className="text-base md:text-lg font-bold font-amiri text-amber-400 group-hover:text-amber-300 transition-colors">
+                تحميل التطبيق المباشر (Android APK)
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5 font-sans">
+                الإصدار 1.5.6 • حجم 22.2 ميجابايت
+              </p>
             </div>
           </div>
-        </button>
-      ) : !isBannerDismissed ? (
-        <div className="w-full relative overflow-hidden rounded-2xl backdrop-blur-xl bg-slate-900/60 border border-emerald-500/20 p-5 md:p-7 flex flex-col items-center justify-center text-center shadow-lg shadow-emerald-900/10">
-          <button
-            onClick={() => {
-              setIsBannerDismissed(true);
-              try {
-                localStorage.setItem("rehab_pwa_banner_dismissed", "true");
-              } catch {}
-            }}
-            className="absolute top-3 left-3 w-7 h-7 rounded-full bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors"
-            title="إغلاق التنبيه"
-          >
-            ✕
-          </button>
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
-          <div className="relative flex flex-col items-center gap-2.5 max-w-xl">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-              <svg
-                className="w-5 h-5 text-emerald-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            {/* Mobile message */}
-            <p className="block md:hidden text-sm md:text-base font-medium text-emerald-100/90 font-amiri leading-relaxed">
-              {PWA_INSTALLED_TEXT}
-            </p>
-            {/* Desktop message */}
-            <p className="hidden md:block text-sm md:text-base font-medium text-emerald-100/90 font-amiri leading-relaxed">
-              {DESKTOP_PWA_TEXT}
-            </p>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-amiri font-semibold group-hover:bg-amber-500/20 group-hover:border-amber-400/40 transition-all shrink-0">
+            <span>تحميل مباشر</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
           </div>
         </div>
-      ) : null}
+      </a>
 
       {/* ── Prayer Times Widget ─────────────────────────────────── */}
       <PrayerTimesWidget />
@@ -488,47 +409,6 @@ export default function HomePage() {
           })}
         </div>
       </section>
-
-      {/* ── Bottom PWA Install Button (disappears when installed) ── */}
-      {canInstallPwa && (
-        <button
-          onClick={() => triggerPwaInstall()}
-          className="w-full relative overflow-hidden rounded-2xl transition-all duration-500 group"
-        >
-          <div className="absolute inset-0 bg-gradient-to-l from-sky-600/20 via-blue-600/15 to-sky-600/20" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-          <div className="relative backdrop-blur-sm border border-sky-500/20 hover:border-sky-500/40 rounded-2xl p-4 md:p-5">
-            <div className="flex items-center justify-center gap-3 md:gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-sky-500/30 blur-xl rounded-full animate-ping" />
-                <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-gradient-to-br from-sky-500/30 to-blue-500/30 border-2 border-sky-400/50">
-                  <svg
-                    className="w-7 h-7 text-sky-300"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-lg md:text-xl font-bold font-amiri text-sky-300">
-                  {PWA_BOTTOM_TITLE}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {PWA_BOTTOM_SUBTITLE}
-                </p>
-              </div>
-            </div>
-          </div>
-        </button>
-      )}
 
       {/* ── Famous Reciters Horizontal Scroll ───────────────────── */}
       {famousReciters.length > 0 && (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { triggerHaptic } from "../utils/haptics";
 
 /**
  * DigitalTasbeeh.tsx
@@ -135,38 +136,66 @@ export default function DigitalTasbeeh() {
 
     // Audio & Haptics
     playClickSound();
-    if (hapticEnabled && navigator.vibrate) {
-      navigator.vibrate(25);
+    if (hapticEnabled) {
+      triggerHaptic(25);
     }
 
-    const nextCount = count + 1;
-
-    // Update stats
+    // Update stats with automatic midnight rollover protection
     setStats((prev) => {
+      const today = getTodayString();
+      const isNewDay = prev.lastDate !== today;
       const nextStats = {
-        ...prev,
-        todayCount: prev.todayCount + 1,
+        lastDate: today,
+        todayCount: isNewDay ? 1 : prev.todayCount + 1,
         allTimeCount: prev.allTimeCount + 1,
       };
       persistData(nextStats);
       return nextStats;
     });
 
-    // Check target reached
-    if (target > 0 && nextCount >= target) {
-      setCount(0);
-      setRoundsCompleted((r) => r + 1);
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 2000);
-
-      // Distinct target celebration haptic
-      if (hapticEnabled && navigator.vibrate) {
-        navigator.vibrate([40, 60, 80]);
+    // Functional update for count to eliminate race conditions
+    setCount((prev) => {
+      const nextCount = prev + 1;
+      if (target > 0 && nextCount >= target) {
+        setRoundsCompleted((r) => r + 1);
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 2000);
+        if (hapticEnabled) {
+          triggerHaptic([40, 60, 80]);
+        }
+        return 0;
       }
-    } else {
-      setCount(nextCount);
-    }
-  }, [count, target, hapticEnabled, playClickSound]);
+      return nextCount;
+    });
+  }, [target, hapticEnabled, playClickSound]);
+
+  // Auto-reset daily Tasbeeh count past midnight without requiring app reload
+  useEffect(() => {
+    const checkDayRollover = () => {
+      const today = getTodayString();
+      setStats((prev) => {
+        if (prev.lastDate !== today) {
+          const reset = { ...prev, todayCount: 0, lastDate: today };
+          persistData(reset);
+          return reset;
+        }
+        return prev;
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkDayRollover();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    const interval = setInterval(checkDayRollover, 60000);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Handle keyboard spacebar / enter for accessibility
   useEffect(() => {

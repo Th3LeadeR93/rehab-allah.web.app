@@ -1,6 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Bell } from "lucide-react";
+import { useAppStore } from "../store/useAppStore";
 import { AZKAR_CATEGORIES, type AzkarCategory, type Zikr } from "../data/azkar";
 import DigitalTasbeeh from "./DigitalTasbeeh";
+import { triggerHaptic } from "../utils/haptics";
 
 function getStorageKey(zikrId: number): string {
   return `azkar-count-${zikrId}`;
@@ -36,13 +39,13 @@ function TasbihCounter({
   const completed = count >= target;
 
   const handleIncrement = useCallback(() => {
-    const next = count + 1;
-    setCount(next);
-    saveCount(zikr.id, next);
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
-    }
-  }, [count, zikr.id]);
+    setCount((prev) => {
+      const next = prev + 1;
+      saveCount(zikr.id, next);
+      return next;
+    });
+    triggerHaptic(50);
+  }, [zikr.id]);
 
   const handleReset = useCallback(() => {
     setCount(0);
@@ -144,6 +147,32 @@ export default function AzkarPage() {
   const [mainTab, setMainTab] = useState<"azkar" | "tasbeeh">("azkar");
   const [activeCategory, setActiveCategory] = useState<AzkarCategory | null>(null);
   const [activeZikr, setActiveZikr] = useState<Zikr | null>(null);
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
+
+  const activeZikrRef = useRef(activeZikr);
+  activeZikrRef.current = activeZikr;
+  const activeCategoryRef = useRef(activeCategory);
+  activeCategoryRef.current = activeCategory;
+
+  // Sub-view back handler for Azkar (Tasbeeh Counter -> Category List -> Categories)
+  useEffect(() => {
+    (window as any).__rehab_azkar_back_handler = (): boolean => {
+      if (activeZikrRef.current) {
+        activeZikrRef.current = null;
+        setActiveZikr(null);
+        return true;
+      }
+      if (activeCategoryRef.current) {
+        activeCategoryRef.current = null;
+        setActiveCategory(null);
+        return true;
+      }
+      return false;
+    };
+    return () => {
+      delete (window as any).__rehab_azkar_back_handler;
+    };
+  }, []);
 
   if (activeZikr) {
     return (
@@ -237,13 +266,22 @@ export default function AzkarPage() {
         <DigitalTasbeeh />
       ) : (
         <div className="space-y-4 md:space-y-6">
-          <div className="text-center">
-            <h2 className="text-xl md:text-2xl font-bold text-amber-400 font-amiri">
-              الأذكار المأثورة
-            </h2>
-            <p className="text-slate-400 text-xs md:text-sm mt-1 font-amiri">
-              حصّن نفسك بأذكار الكتاب والسنة الصحيحة
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-amber-400 font-amiri">
+                الأذكار المأثورة
+              </h2>
+              <p className="text-slate-400 text-xs md:text-sm mt-0.5 font-amiri">
+                حصّن نفسك بأذكار الكتاب والسنة الصحيحة
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab("settings")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 text-xs font-amiri transition-colors"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>تنبيهات الأذكار</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">

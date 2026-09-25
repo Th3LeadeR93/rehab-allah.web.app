@@ -11,6 +11,18 @@ export default function ChatButton() {
   const showMiniPlayer = useAppStore((s) => s.showMiniPlayer);
   const queue = useAppStore((s) => s.queue);
 
+  // ✅ STRICT PLATFORM EXCLUSIVITY:
+  // Inside the native Android application WebView, the native Jetpack Compose
+  // DraggableSpiritualAssistantBubble handles assistant interactions.
+  // Never render the web floating button on Android to prevent UI duplication.
+  const isAndroidApp =
+    typeof window !== "undefined" &&
+    Boolean((window as any).AndroidBridge || (window as any).AndroidAudioBridge);
+
+  if (isAndroidApp) {
+    return null;
+  }
+
   const hasMiniPlayer = showMiniPlayer && queue.length > 0;
 
   return (

@@ -33,17 +33,12 @@ export interface QueueTrack {
 }
 
 export type RepeatMode = "none" | "all" | "one";
-export type ActiveTab = "quran" | "azkar" | "mushaf" | "prayer" | "settings";
-
-export interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-  prompt(): Promise<void>;
-}
+export type ActiveTab = "quran" | "azkar" | "mushaf" | "prayer" | "ramadan" | "settings";
 
 interface PersistedState {
   mushafSurahId: number;
   mushafAyahIndex: number;
+  mushafPageIndex: number;
   volume: number;
 }
 
@@ -71,9 +66,6 @@ interface TransientState {
   // Live-stream (HLS) status — surfaced in the MiniPlayer UI.
   liveStreamLoading: boolean;
   liveStreamError: boolean;
-  // PWA State
-  deferredPrompt: BeforeInstallPromptEvent | null;
-  isPwaInstallable: boolean;
 }
 
 type AppState = PersistedState &
@@ -101,6 +93,7 @@ type AppState = PersistedState &
     setSleepTimerEndTrack: (v: boolean) => void;
     setMushafSurahId: (id: number) => void;
     setMushafAyahIndex: (i: number) => void;
+    setMushafPageIndex: (index: number) => void;
     setIsRadioMode: (v: boolean) => void;
     setLiveStreamLoading: (v: boolean) => void;
     setLiveStreamError: (v: boolean) => void;
@@ -112,9 +105,6 @@ type AppState = PersistedState &
     setShowMiniPlayer: (v: boolean) => void;
     totalStop: () => void;
     seek: (t: number) => void;
-    // PWA Actions
-    setPwaPrompt: (prompt: BeforeInstallPromptEvent | null, installable: boolean) => void;
-    triggerPwaInstall: () => Promise<void>;
   };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -467,6 +457,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       mushafSurahId: 1,
       mushafAyahIndex: 0,
+      mushafPageIndex: 0,
       volume: 1.0,
       activeTab: "quran",
       reciters: [],
@@ -490,8 +481,6 @@ export const useAppStore = create<AppState>()(
       showMiniPlayer: false,
       liveStreamLoading: false,
       liveStreamError: false,
-      deferredPrompt: null,
-      isPwaInstallable: false,
 
       setActiveTab: (tab) => set({ activeTab: tab }),
       setReciters: (r) => set({ reciters: r }),
@@ -566,6 +555,7 @@ export const useAppStore = create<AppState>()(
       setSleepTimerEndTrack: (v) => set({ sleepTimerEndTrack: v, sleepTimer: null, sleepTimerRemaining: null }),
       setMushafSurahId: (id) => set({ mushafSurahId: id }),
       setMushafAyahIndex: (i) => set({ mushafAyahIndex: i }),
+      setMushafPageIndex: (index) => set({ mushafPageIndex: index }),
       setIsRadioMode: (v) => set({ isRadioMode: v }),
       setLiveStreamLoading: (v) => set({ liveStreamLoading: v }),
       setLiveStreamError: (v) => set({ liveStreamError: v }),
@@ -632,14 +622,6 @@ export const useAppStore = create<AppState>()(
         };
         set({ queue: [radioTrack], queueIndex: 0, isPlaying: true, showMiniPlayer: true, isRadioMode: true, shuffle: false, repeat: "none", showReciterDialog: false, selectedReciter: null });
       },
-      setPwaPrompt: (prompt, installable) => set({ deferredPrompt: prompt, isPwaInstallable: installable }),
-      triggerPwaInstall: async () => {
-        const promptEvent = get().deferredPrompt;
-        if (!promptEvent) return;
-        promptEvent.prompt();
-        const { outcome } = await promptEvent.userChoice;
-        set({ deferredPrompt: null, isPwaInstallable: false });
-      },
     }),
     {
       name: "rehab-allah-storage",
@@ -648,11 +630,15 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         mushafSurahId: state.mushafSurahId,
         mushafAyahIndex: state.mushafAyahIndex,
+        mushafPageIndex: state.mushafPageIndex,
         volume: state.volume,
       }),
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown> | null;
-        if (state && (state.volume === undefined || state.volume === 0.8)) state.volume = 1.0;
+        if (state) {
+          if (state.volume === undefined || state.volume === 0.8) state.volume = 1.0;
+          if (state.mushafPageIndex === undefined || typeof state.mushafPageIndex !== "number") state.mushafPageIndex = 0;
+        }
         return state as any as PersistedState;
       },
     }
@@ -824,6 +810,7 @@ if (typeof window !== "undefined") {
         
         if (isPlaying) {
           audio.play().catch((err) => {
+            console.error("[Audio] Playback error on source load:", err);
             if ((err as Error)?.name !== "AbortError") handlePlaybackError();
           });
         }

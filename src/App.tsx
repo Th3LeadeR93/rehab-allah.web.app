@@ -10,14 +10,15 @@ import MiniPlayer from "./components/MiniPlayer";
 import QueueDrawer from "./components/QueueDrawer";
 import ReciterDialog from "./components/ReciterDialog";
 import ChatButton from "./components/ChatButton";
+import ChatSidebar from "./components/ChatSidebar";
 import UpdateBanner from "./components/UpdateBanner";
 
 // Lazy-loaded secondary views for code splitting
 const AzkarPage = lazy(() => import("./components/AzkarPage"));
 const MushafPage = lazy(() => import("./components/MushafPage"));
 const PrayerSettings = lazy(() => import("./components/PrayerSettings"));
+const RamadanHub = lazy(() => import("./components/RamadanHub"));
 const AppSettings = lazy(() => import("./components/AppSettings"));
-const ChatSidebar = lazy(() => import("./components/ChatSidebar"));
 
 function TabLoadingFallback() {
   return (
@@ -48,6 +49,7 @@ const THEME_CLASSES: Record<string, string> = {
 
 export default function App() {
   const activeTab = useAppStore((s) => s.activeTab);
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setReciters = useAppStore((s) => s.setReciters);
   const setRecitersLoading = useAppStore((s) => s.setRecitersLoading);
   const showMiniPlayer = useAppStore((s) => s.showMiniPlayer);
@@ -58,6 +60,91 @@ export default function App() {
 
   const theme = useSettingsStore((s) => s.theme);
   const fontScale = useSettingsStore((s) => s.fontScale);
+
+  // Sync activeTab with native Android bridge so Android always knows current location
+  useEffect(() => {
+    try {
+      const bridge = (window as any).AndroidBridge || (window as any).AndroidAudioBridge;
+      if (bridge && typeof bridge.onTabChanged === "function") {
+        bridge.onTabChanged(activeTab);
+      }
+    } catch (_) {}
+  }, [activeTab]);
+
+  // Global Zero-Exit Hierarchical Back Handler callable by native Android system back & gestures
+  useEffect(() => {
+    (window as any).__rehab_handle_back_press = (): boolean => {
+      // 1. Check Spiritual Assistant drawer
+      try {
+        const chatStore = (window as any).__rehab_chat_store?.getState?.();
+        if (chatStore?.isSidebarOpen) {
+          chatStore.closeSidebar();
+          return true;
+        }
+      } catch (_) {}
+
+      // 2. Check Reciter Dialog & Queue Drawer
+      const appStore = useAppStore.getState();
+      if (appStore.showReciterDialog) {
+        appStore.closeReciterDialog();
+        return true;
+      }
+      if (appStore.showQueue) {
+        appStore.toggleQueue();
+        return true;
+      }
+
+      // 3. Check page-level sub-view back handlers (Mushaf modals, Azkar tasbeeh/category)
+      if (typeof (window as any).__rehab_mushaf_back_handler === "function") {
+        if ((window as any).__rehab_mushaf_back_handler()) {
+          return true;
+        }
+      }
+      if (typeof (window as any).__rehab_azkar_back_handler === "function") {
+        if ((window as any).__rehab_azkar_back_handler()) {
+          return true;
+        }
+      }
+
+      // 4. Check any generic modal dialog in the DOM
+      const closeButtons = document.querySelectorAll(
+        '[aria-label="Close"], [aria-label="إغلاق"], button.close, .modal-close, button:has(svg.lucide-x)'
+      );
+      for (let i = 0; i < closeButtons.length; i++) {
+        const btn = closeButtons[i] as HTMLElement;
+        if (btn.offsetParent !== null) {
+          btn.click();
+          return true;
+        }
+      }
+
+      // 5. If user is in ANY sub-section or tab, smoothly navigate back to Home Page ("quran")
+      if (appStore.activeTab !== "quran") {
+        appStore.setActiveTab("quran");
+        return true;
+      }
+
+      // 6. User is ALREADY on the Home Page -> ZERO-EXIT POLICY: do nothing!
+      return false;
+    };
+
+    return () => {
+      delete (window as any).__rehab_handle_back_press;
+    };
+  }, []);
+
+  // Fast Navigation event listener from Native Android Notification Actions (e.g. Mushaf, Azkar)
+  useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const dest = customEvent.detail?.toLowerCase();
+      if (dest && ["quran", "azkar", "mushaf", "prayer", "ramadan", "settings"].includes(dest)) {
+        setActiveTab(dest as any);
+      }
+    };
+    window.addEventListener("rehab-navigate", handleNavigate);
+    return () => window.removeEventListener("rehab-navigate", handleNavigate);
+  }, [setActiveTab]);
 
   useEffect(() => {
     async function fetchReciters() {
@@ -161,6 +248,9 @@ export default function App() {
             {activeTab === "azkar" && <AzkarPage />}
             {activeTab === "mushaf" && <MushafPage />}
 
+            {/* ✅ Ramadan Hub — Anticipation Mode / Active Worship Mode */}
+            {activeTab === "ramadan" && <RamadanHub />}
+
             {/* ✅ Prayer dashboard — visible on ALL platforms.
                 Athan notification controls inside are guarded by isAndroid. */}
             {activeTab === "prayer" && <PrayerSettings />}
@@ -175,11 +265,9 @@ export default function App() {
       <QueueDrawer />
       <ReciterDialog />
 
-      {/* AI Islamic Assistant */}
+      {/* AI Islamic Assistant Modal & Floating Trigger */}
       <ChatButton />
-      <Suspense fallback={null}>
-        <ChatSidebar />
-      </Suspense>
+      <ChatSidebar />
     </div>
   );
 }

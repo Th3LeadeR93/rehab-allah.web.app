@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   usePrayerStore,
   MUADHIN_OPTIONS,
@@ -6,6 +6,7 @@ import {
   isAndroid,
   type PrayerName,
 } from "../store/usePrayerStore";
+import { useRamadanStore } from "../store/useRamadanStore";
 import QiblaCompass from "./QiblaCompass";
 
 /**
@@ -108,6 +109,10 @@ export default function PrayerSettings() {
   const setCalculationMethod = usePrayerStore((s) => s.setCalculationMethod);
   const refreshPrayerTimes = usePrayerStore((s) => s.refreshPrayerTimes);
   const fetchPrayerTimes = usePrayerStore((s) => s.fetchPrayerTimes);
+
+  /* ── Ramadan / Moon sighting offset ────────────────────────────────── */
+  const hijriOffset = useRamadanStore((s) => s.hijriOffset);
+  const setHijriOffset = useRamadanStore((s) => s.setHijriOffset);
 
   /* ── Athan controls (Android only) ────────────────────────────────── */
   const selectedMuadhinId = usePrayerStore((s) => s.selectedMuadhinId);
@@ -555,6 +560,36 @@ export default function PrayerSettings() {
               >
                 {isFetchingTimes ? REFRESHING_TEXT : REFRESH_BTN}
               </button>
+            </div>
+          </div>
+
+          {/* ── Moon Sighting & Hijri Offset Calibration ── */}
+          <div className="rounded-2xl border border-amber-500/20 bg-slate-900/60 p-5 md:p-6 backdrop-blur-xl">
+            <h3 className="text-base md:text-lg font-bold text-amber-400 font-amiri mb-2 flex items-center gap-2">
+              <span>🔭</span>
+              <span>ثبوت الرؤية الشرعية وضبط التقويم الهجري</span>
+            </h3>
+            <p className="text-xs text-slate-400 font-amiri mb-4 leading-relaxed">
+              يمكنك ضبط وتعديل اليوم الهجري (بزيادة أو إنقاص يوم أو يومين) ليتوافق بدقة مع إعلان المحكمة الشرعية في بلدك لثبوت دخول الشهور وهلال شهر رمضان المبارك.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 font-sans">
+              {[-2, -1, 0, 1, 2].map((offset) => (
+                <button
+                  key={offset}
+                  onClick={() => {
+                    setHijriOffset(offset);
+                    localStorage.setItem("rehab-user-offset-locked", "true");
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold transition-all ${
+                    hijriOffset === offset
+                      ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 font-extrabold"
+                      : "bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 border border-white/5"
+                  }`}
+                >
+                  {offset > 0 ? `+${offset}` : offset} يوم {offset === 0 && "(تلقائي)"}
+                </button>
+              ))}
             </div>
           </div>
         </section>

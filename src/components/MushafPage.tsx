@@ -64,16 +64,21 @@ function getStoredFontSize(): number {
   return 20;
 }
 
+// Global in-memory caches across component mounts for zero-flicker instant transitions
+const globalSurahCache = new Map<number, AyahData[]>();
+const globalTafseerCache = new Map<number, Map<number, string>>();
+
 export default function MushafPage() {
   const mushafSurahId = useAppStore((s) => s.mushafSurahId);
   const setMushafSurahId = useAppStore((s) => s.setMushafSurahId);
   const setMushafAyahIndex = useAppStore((s) => s.setMushafAyahIndex);
+  const mushafPageIndex = useAppStore((s) => s.mushafPageIndex);
+  const setMushafPageIndex = useAppStore((s) => s.setMushafPageIndex);
   const reciters = useAppStore((s) => s.reciters);
   const setQueue = useAppStore((s) => s.setQueue);
 
-  const [ayahs, setAyahs] = useState<AyahData[]>([]);
+  const [ayahs, setAyahs] = useState<AyahData[]>(() => globalSurahCache.get(mushafSurahId) || []);
   const [loading, setLoading] = useState(false);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   // Active selected Ayah for action sheet
   const [actionAyah, setActionAyah] = useState<AyahData | null>(null);
@@ -94,10 +99,37 @@ export default function MushafPage() {
   const [showBookmarksModal, setShowBookmarksModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Sub-view back handler for Mushaf (dismisses modals/drawers while keeping page position)
+  useEffect(() => {
+    (window as any).__rehab_mushaf_back_handler = (): boolean => {
+      if (showBookmarksModal) {
+        setShowBookmarksModal(false);
+        return true;
+      }
+      if (showTafseerDrawer) {
+        setShowTafseerDrawer(false);
+        return true;
+      }
+      if (actionAyah) {
+        setActionAyah(null);
+        return true;
+      }
+      if (showSurahDropdown) {
+        setShowSurahDropdown(false);
+        return true;
+      }
+      return false;
+    };
+
+    return () => {
+      delete (window as any).__rehab_mushaf_back_handler;
+    };
+  }, [showBookmarksModal, showTafseerDrawer, actionAyah, showSurahDropdown]);
+
   const bookRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
 
   const currentSurah = useMemo(
     () => SURAHS.find((s) => s.id === mushafSurahId) ?? SURAHS[0],
@@ -143,33 +175,112 @@ export default function MushafPage() {
   }, [ayahs]);
 
   const totalPages = pages.length;
-  const currentPage = pages[currentPageIndex] ?? [];
+  // Clamped page index ensuring zero out-of-bounds access
+  const safePageIndex = Math.max(0, Math.min(mushafPageIndex, Math.max(0, totalPages - 1)));
+  const currentPage = pages[safePageIndex] ?? [];
+
+  // If mushafPageIndex in store exceeds totalPages once ayahs are loaded, clamp it
+  useEffect(() => {
+    if (totalPages > 0 && mushafPageIndex >= totalPages) {
+      setMushafPageIndex(totalPages - 1);
+    }
+  }, [totalPages, mushafPageIndex, setMushafPageIndex]);
 
   // Check if current page is bookmarked
   const isCurrentPageBookmarked = useMemo(() => {
     return bookmarks.some(
-      (b) => b.surahId === mushafSurahId && b.pageIndex === currentPageIndex
+      (b) => b.surahId === mushafSurahId && b.pageIndex === safePageIndex
     );
-  }, [bookmarks, mushafSurahId, currentPageIndex]);
+  }, [bookmarks, mushafSurahId, safePageIndex]);
 
-  // Fetch ayahs from Alquran Cloud with fallback
-  const fetchAyahs = useCallback(async (surahId: number) => {
-    setLoading(true);
-    setAyahs([]);
-    setActionAyah(null);
-    setTafseer("");
-    setShowTafseerDrawer(false);
-    setCurrentPageIndex(0);
+  // Preload adjacent surahs in the background silently for instant zero-wait transitions
+  const preloadSurah = useCallback(async (surahId: number) => {
+    if (surahId < 1 || surahId > 114 || globalSurahCache.has(surahId)) return;
+    try {
+      const localRes = await fetch(`/quran/surah_${surahId}.json`);
+      if (localRes.ok) {
+        const localData = await localRes.json();
+        if (localData.code === 200 && localData.data?.ayahs) {
+          const mapped: AyahData[] = localData.data.ayahs.map(
+            (a: { number: number; numberInSurah: number; text: string }) => ({
+              number: a.number,
+              numberInSurah: a.numberInSurah,
+              text: a.text,
+            })
+          );
+          globalSurahCache.set(surahId, mapped);
+          return;
+        }
+      }
+    } catch {}
 
     try {
       const res = await fetch(`https://api.alquran.cloud/v1/surah/${surahId}`);
       const data = await res.json();
       if (data.code === 200 && data.data?.ayahs) {
-        const mapped: AyahData[] = data.data.ayahs.map((a: { number: number; numberInSurah: number; text: string }) => ({
-          number: a.number,
-          numberInSurah: a.numberInSurah,
-          text: a.text,
-        }));
+        const mapped: AyahData[] = data.data.ayahs.map(
+          (a: { number: number; numberInSurah: number; text: string }) => ({
+            number: a.number,
+            numberInSurah: a.numberInSurah,
+            text: a.text,
+          })
+        );
+        globalSurahCache.set(surahId, mapped);
+      }
+    } catch {}
+  }, []);
+
+  // Fetch ayahs: in-memory cache -> local offline JSON -> fallback API (zero-flicker)
+  const fetchAyahs = useCallback(async (surahId: number) => {
+    // 1. Instant check in memory cache (Zero flicker!)
+    if (globalSurahCache.has(surahId)) {
+      setAyahs(globalSurahCache.get(surahId)!);
+      setLoading(false);
+      preloadSurah(surahId + 1);
+      preloadSurah(surahId - 1);
+      return;
+    }
+
+    setLoading(true);
+
+    // 2. Try local bundled offline JSON first
+    try {
+      const localRes = await fetch(`/quran/surah_${surahId}.json`);
+      if (localRes.ok) {
+        const localData = await localRes.json();
+        if (localData.code === 200 && localData.data?.ayahs) {
+          const mapped: AyahData[] = localData.data.ayahs.map(
+            (a: { number: number; numberInSurah: number; text: string }) => ({
+              number: a.number,
+              numberInSurah: a.numberInSurah,
+              text: a.text,
+            })
+          );
+          globalSurahCache.set(surahId, mapped);
+          setAyahs(mapped);
+          setLoading(false);
+          preloadSurah(surahId + 1);
+          preloadSurah(surahId - 1);
+          return;
+        }
+      }
+    } catch {
+      // local fetch failed, fall through
+    }
+
+    // 3. Fallback to API (intercepted offline on Android WebView)
+    try {
+      const res = await fetch(`https://api.alquran.cloud/v1/surah/${surahId}`);
+      const data = await res.json();
+      if (data.code === 200 && data.data?.ayahs) {
+        const mapped: AyahData[] = data.data.ayahs.map(
+          (a: { number: number; numberInSurah: number; text: string }) => ({
+            number: a.number,
+            numberInSurah: a.numberInSurah,
+            text: a.text,
+          })
+        );
+        globalSurahCache.set(surahId, mapped);
         setAyahs(mapped);
       } else {
         const surah = SURAHS.find((s) => s.id === surahId);
@@ -182,6 +293,7 @@ export default function MushafPage() {
               text: `﴿ آية ${i + 1} من سورة ${surah.name} ﴾`,
             })
           );
+          globalSurahCache.set(surahId, generated);
           setAyahs(generated);
         }
       }
@@ -196,15 +308,50 @@ export default function MushafPage() {
             text: `﴿ آية ${i + 1} من سورة ${surah.name} ﴾`,
           })
         );
+        globalSurahCache.set(surahId, generated);
         setAyahs(generated);
       }
     } finally {
       setLoading(false);
+      preloadSurah(surahId + 1);
+      preloadSurah(surahId - 1);
     }
-  }, []);
+  }, [preloadSurah]);
 
   const fetchTafseer = useCallback(async (surahId: number, ayahNum: number) => {
+    // 1. Check in-memory cache
+    const surahTafseer = globalTafseerCache.get(surahId);
+    if (surahTafseer && surahTafseer.has(ayahNum)) {
+      setTafseer(surahTafseer.get(ayahNum)!);
+      return;
+    }
+
     setTafseerLoading(true);
+
+    // 2. Try loading local offline tafseer JSON
+    try {
+      const localRes = await fetch(`/quran/tafseer_${surahId}.json`);
+      if (localRes.ok) {
+        const data = await localRes.json();
+        if (data.tafseer && Array.isArray(data.tafseer)) {
+          const map = new Map<number, string>();
+          for (const item of data.tafseer) {
+            map.set(item.ayahNumber, item.text);
+          }
+          globalTafseerCache.set(surahId, map);
+          const found = map.get(ayahNum);
+          if (found) {
+            setTafseer(found);
+            setTafseerLoading(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // local fetch failed, fall through
+    }
+
+    // 3. Fallback to API (intercepted offline on Android WebView)
     try {
       const res = await fetch(
         `https://api.alquran.cloud/v1/ayah/${surahId}:${ayahNum}/ar.muyassar`
@@ -212,6 +359,10 @@ export default function MushafPage() {
       const data = await res.json();
       if (data.code === 200 && data.data?.text) {
         setTafseer(data.data.text);
+        if (!globalTafseerCache.has(surahId)) {
+          globalTafseerCache.set(surahId, new Map());
+        }
+        globalTafseerCache.get(surahId)!.set(ayahNum, data.data.text);
       } else {
         setTafseer("التفسير غير متاح حالياً لهذه الآية");
       }
@@ -264,31 +415,85 @@ export default function MushafPage() {
     }
   };
 
-  // Action 3: Play Recitation audio
+  // Action 3: Play Recitation audio for the entire Surah
   const handlePlayRecitation = () => {
-    if (reciters.length > 0) {
+    let audioUrl = "";
+    let reciterName = "مشاري راشد العفاسي";
+    let reciterId = 128;
+
+    if (reciters && reciters.length > 0) {
       const reciter = reciters.find((r) => r.id === 128) ?? reciters[0];
       const moshaf =
-        reciter.moshaf.find((m) => m.moshaf_type === 11) ?? reciter.moshaf[0];
-      if (moshaf) {
-        const surahIds = moshaf.surah_list.split(",").map(Number);
-        if (surahIds.includes(mushafSurahId)) {
-          setQueue(
-            [
-              {
-                reciterId: reciter.id,
-                reciterName: reciter.name,
-                surahId: mushafSurahId,
-                surahName: currentSurah.name,
-                url: `${moshaf.server}${padSurahId(mushafSurahId)}.mp3`,
-              },
-            ],
-            0
-          );
-          showToast(`جاري تشغيل سورة ${currentSurah.name} بصوت الشيخ ${reciter.name}`);
-        }
+        reciter?.moshaf?.find((m) => m.moshaf_type === 11) ?? reciter?.moshaf?.[0];
+      if (moshaf && moshaf.server) {
+        reciterName = reciter.name || reciterName;
+        reciterId = reciter.id || reciterId;
+        const safeServer = moshaf.server.replace(/^http:\/\//i, "https://").replace(/\/?$/, "/");
+        audioUrl = `${safeServer}${padSurahId(mushafSurahId)}.mp3`;
       }
     }
+
+    // High-reliability HTTPS CDN Fallback if reciters list was unavailable
+    if (!audioUrl) {
+      audioUrl = `https://server8.mp3quran.net/afs/${padSurahId(mushafSurahId)}.mp3`;
+    }
+
+    const title = `سورة ${currentSurah.name}`;
+    try {
+      const bridge = (window as any).AndroidBridge || (window as any).AndroidAudioBridge;
+      if (bridge && typeof bridge.playAudio === "function") {
+        bridge.playAudio(audioUrl, title, reciterName);
+      } else if (bridge && typeof bridge.playNativeTrack === "function") {
+        bridge.playNativeTrack(title, reciterName, audioUrl, false);
+      }
+    } catch (_) {}
+
+    setQueue(
+      [
+        {
+          reciterId,
+          reciterName,
+          surahId: mushafSurahId,
+          surahName: currentSurah.name,
+          url: audioUrl,
+        },
+      ],
+      0
+    );
+    showToast(`جاري تشغيل سورة ${currentSurah.name} بصوت الشيخ ${reciterName}`);
+    setActionAyah(null);
+  };
+
+  // Action 3b: Play Recitation audio for the specific selected Ayah
+  const handlePlayAyah = (ayah: AyahData) => {
+    const surahStr = padSurahId(mushafSurahId);
+    const ayahStr = String(ayah.numberInSurah).padStart(3, "0");
+    const audioUrl = `https://everyayah.com/data/Alafasy_128kbps/${surahStr}${ayahStr}.mp3`;
+    const title = `سورة ${currentSurah.name} - الآية ${ayah.numberInSurah}`;
+    const reciterName = "مشاري راشد العفاسي";
+
+    try {
+      const bridge = (window as any).AndroidBridge || (window as any).AndroidAudioBridge;
+      if (bridge && typeof bridge.playAudio === "function") {
+        bridge.playAudio(audioUrl, title, reciterName);
+      } else if (bridge && typeof bridge.playNativeTrack === "function") {
+        bridge.playNativeTrack(title, reciterName, audioUrl, false);
+      }
+    } catch (_) {}
+
+    setQueue(
+      [
+        {
+          reciterId: 128,
+          reciterName,
+          surahId: mushafSurahId,
+          surahName: title,
+          url: audioUrl,
+        },
+      ],
+      0
+    );
+    showToast(`جاري الاستماع للآية ${ayah.numberInSurah} من سورة ${currentSurah.name}`);
     setActionAyah(null);
   };
 
@@ -298,7 +503,7 @@ export default function MushafPage() {
     const ayahNum = targetAyah ? targetAyah.numberInSurah : 1;
 
     const existingIndex = bookmarks.findIndex(
-      (b) => b.surahId === mushafSurahId && b.pageIndex === currentPageIndex
+      (b) => b.surahId === mushafSurahId && b.pageIndex === safePageIndex
     );
 
     let updated: BookmarkItem[];
@@ -307,11 +512,11 @@ export default function MushafPage() {
       showToast("تمت إزالة الفاصلة");
     } else {
       const newBookmark: BookmarkItem = {
-        id: `${mushafSurahId}-${currentPageIndex}-${Date.now()}`,
+        id: `${mushafSurahId}-${safePageIndex}-${Date.now()}`,
         surahId: mushafSurahId,
         surahName: currentSurah.name,
         ayahNumber: ayahNum,
-        pageIndex: currentPageIndex,
+        pageIndex: safePageIndex,
         timestamp: Date.now(),
       };
       updated = [newBookmark, ...bookmarks];
@@ -325,19 +530,12 @@ export default function MushafPage() {
 
   const handleJumpToBookmark = (b: BookmarkItem) => {
     setShowBookmarksModal(false);
-    if (b.surahId !== mushafSurahId) {
-      setMushafSurahId(b.surahId);
-      setTimeout(() => {
-        setCurrentPageIndex(b.pageIndex);
-        if (bookRef.current) {
-          bookRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }, 150);
-    } else {
-      setCurrentPageIndex(b.pageIndex);
-      if (bookRef.current) {
-        bookRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+    setMushafSurahId(b.surahId);
+    setMushafPageIndex(b.pageIndex);
+    setActionAyah(null);
+    setTafseer("");
+    if (bookRef.current) {
+      bookRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     showToast(`انتقلت إلى ${b.surahName} (الآية ${b.ayahNumber})`);
   };
@@ -353,49 +551,65 @@ export default function MushafPage() {
   const handleSurahSelect = (surah: SurahInfo) => {
     setMushafSurahId(surah.id);
     setMushafAyahIndex(0);
+    setMushafPageIndex(0);
     setShowSurahDropdown(false);
     setSurahSearch("");
-    setCurrentPageIndex(0);
+    setActionAyah(null);
+    setTafseer("");
   };
 
   const goToNextPage = () => {
-    if (currentPageIndex < totalPages - 1) {
-      setCurrentPageIndex(currentPageIndex + 1);
+    if (safePageIndex < totalPages - 1) {
+      setMushafPageIndex(safePageIndex + 1);
       setActionAyah(null);
       setTafseer("");
     } else if (mushafSurahId < 114) {
       setMushafSurahId(mushafSurahId + 1);
-      setCurrentPageIndex(0);
+      setMushafPageIndex(0);
+      setActionAyah(null);
+      setTafseer("");
     }
   };
 
   const goToPrevPage = () => {
-    if (currentPageIndex > 0) {
-      setCurrentPageIndex(currentPageIndex - 1);
+    if (safePageIndex > 0) {
+      setMushafPageIndex(safePageIndex - 1);
       setActionAyah(null);
       setTafseer("");
     } else if (mushafSurahId > 1) {
-      setMushafSurahId(mushafSurahId - 1);
-      setCurrentPageIndex(0);
+      const prevSurahId = mushafSurahId - 1;
+      const prevSurahInfo = SURAHS.find((s) => s.id === prevSurahId);
+      const prevAyahCount = prevSurahInfo?.ayahCount || 1;
+      const prevLastPageIndex = Math.max(0, Math.ceil(prevAyahCount / AYAHS_PER_PAGE) - 1);
+
+      setMushafSurahId(prevSurahId);
+      setMushafPageIndex(prevLastPageIndex);
+      setActionAyah(null);
+      setTafseer("");
     }
   };
 
   const goToNextSurah = () => {
     if (mushafSurahId < 114) {
       setMushafSurahId(mushafSurahId + 1);
-      setCurrentPageIndex(0);
+      setMushafPageIndex(0);
+      setActionAyah(null);
+      setTafseer("");
     }
   };
 
   const goToPrevSurah = () => {
     if (mushafSurahId > 1) {
       setMushafSurahId(mushafSurahId - 1);
-      setCurrentPageIndex(0);
+      setMushafPageIndex(0);
+      setActionAyah(null);
+      setTafseer("");
     }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchEndX.current = null; // Strictly reset to null: taps never register as swipes!
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -403,12 +617,23 @@ export default function MushafPage() {
   };
 
   const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchEndX.current === null) {
+      // It was a tap without movement: ignore swipe logic!
+      touchStartX.current = null;
+      touchEndX.current = null;
+      return;
+    }
     const diff = touchStartX.current - touchEndX.current;
-    const threshold = 50;
+    const threshold = 60;
+    touchStartX.current = null;
+    touchEndX.current = null;
+
     if (Math.abs(diff) > threshold) {
       if (diff > 0) {
+        // Dragged leftwards in RTL -> Next page
         goToNextPage();
       } else {
+        // Dragged rightwards in RTL -> Previous page
         goToPrevPage();
       }
     }
@@ -640,13 +865,19 @@ export default function MushafPage() {
       </div>
 
       {/* ── Mushaf Book Layout ──────────────────────────────────────── */}
-      {loading ? (
+      {loading && ayahs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 rounded-2xl bg-slate-900/40 border border-white/5">
           <div className="w-10 h-10 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
           <p className="text-slate-400 text-sm mt-4 font-amiri">جاري تحميل الآيات الكريمة...</p>
         </div>
       ) : (
         <div className="relative">
+          {/* Subtle top progress bar when swapping surahs in background */}
+          {loading && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500/20 overflow-hidden z-30 rounded-t-2xl">
+              <div className="h-full bg-amber-400 animate-pulse w-full" />
+            </div>
+          )}
           <div
             ref={bookRef}
             className={`rounded-2xl overflow-hidden relative shadow-2xl transition-colors duration-300 ${themeStyles.wrapperBg}`}
@@ -683,7 +914,7 @@ export default function MushafPage() {
                 <p className={`text-xs md:text-sm mt-1 font-amiri ${themeStyles.subText}`}>
                   {currentSurah.type === "meccan" ? "مكية" : "مدنية"} • {currentSurah.ayahCount} آية
                 </p>
-                {mushafSurahId !== 9 && currentPageIndex === 0 && (
+                {mushafSurahId !== 9 && safePageIndex === 0 && (
                   <p className={`text-xl md:text-2xl font-scheherazade mt-3 ${themeStyles.basmalaText}`}>
                     بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                   </p>
@@ -723,10 +954,15 @@ export default function MushafPage() {
               </div>
 
               {/* Page navigation footer */}
-              <div className={`flex items-center justify-between px-4 sm:px-6 py-3.5 border-t ${themeStyles.footerBorder} ${themeStyles.footerBg}`}>
+              <div
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                className={`flex items-center justify-between px-4 sm:px-6 py-3.5 border-t ${themeStyles.footerBorder} ${themeStyles.footerBg}`}
+              >
                 <button
                   onClick={goToPrevPage}
-                  disabled={currentPageIndex === 0 && mushafSurahId === 1}
+                  disabled={safePageIndex === 0 && mushafSurahId === 1}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-amiri font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed ${themeStyles.buttonBg}`}
                 >
                   <span>→</span>
@@ -734,12 +970,12 @@ export default function MushafPage() {
                 </button>
 
                 <div className="text-center font-amiri text-xs md:text-sm text-slate-500 font-medium">
-                  <span>صفحة {currentPageIndex + 1} من {totalPages || 1}</span>
+                  <span>صفحة {safePageIndex + 1} من {totalPages || 1}</span>
                 </div>
 
                 <button
                   onClick={goToNextPage}
-                  disabled={currentPageIndex >= totalPages - 1 && mushafSurahId === 114}
+                  disabled={safePageIndex >= totalPages - 1 && mushafSurahId === 114}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-amiri font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed ${themeStyles.buttonBg}`}
                 >
                   <span>الصفحة التالية</span>
@@ -803,16 +1039,24 @@ export default function MushafPage() {
               </button>
 
               <button
+                onClick={() => actionAyah && handlePlayAyah(actionAyah)}
+                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 text-xs md:text-sm font-bold transition-all"
+              >
+                <span>▶️</span>
+                <span>استماع للآية</span>
+              </button>
+
+              <button
                 onClick={handlePlayRecitation}
                 className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/5 text-slate-200 text-xs md:text-sm font-bold transition-all"
               >
-                <span>▶️</span>
+                <span>🔊</span>
                 <span>استماع للسورة</span>
               </button>
 
               <button
                 onClick={() => handleToggleBookmark(actionAyah)}
-                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs md:text-sm font-bold transition-all"
+                className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs md:text-sm font-bold transition-all"
               >
                 <span>🔖</span>
                 <span>حفظ في الفواصل</span>

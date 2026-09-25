@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePrayerStore } from "../store/usePrayerStore";
+import DailyPrayerTrackerCard from "./DailyPrayerTrackerCard";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface PrayerTime {
@@ -248,6 +249,9 @@ export default function PrayerTimesWidget() {
             );
           })}
         </div>
+
+        {/* Daily Prayer Tracker Card */}
+        <DailyPrayerTrackerCard />
 
         {/* Footer — Hijri date */}
         {hijriDateFormatted && (

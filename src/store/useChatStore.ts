@@ -5,6 +5,7 @@ import {
   resetChatSession,
   type ChatMessage,
 } from "../services/geminiService";
+import { parseAndExecuteAgentActions, stripActionTags } from "../services/agentActionDispatcher";
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
@@ -98,12 +99,16 @@ export const useChatStore = create<ChatState>()(
           // We only add it once the FIRST chunk arrives so the "thinking" skeleton
           // stays visible until there's actual text to show.
           let started = false;
+          let accumulatedRawText = "";
 
           // Stream the response. `onChunk` fires for every incremental delta.
           const responseText = await sendMessage(
             text.trim(),
             historyForApi,
             (delta) => {
+              accumulatedRawText += delta;
+              const displayDelta = stripActionTags(accumulatedRawText);
+
               set((s) => {
                 if (!started) {
                   // First chunk → create the assistant bubble, hide the skeleton,
@@ -111,7 +116,7 @@ export const useChatStore = create<ChatState>()(
                   started = true;
                   const assistantMsg: ChatMessage = {
                     role: "model",
-                    text: delta,
+                    text: displayDelta,
                     timestamp: Date.now(),
                   };
                   return {
@@ -127,35 +132,35 @@ export const useChatStore = create<ChatState>()(
                 const last = msgs[msgs.length - 1];
                 msgs[msgs.length - 1] = {
                   ...last,
-                  text: last.text + delta,
+                  text: displayDelta,
                 };
                 return { messages: msgs };
               });
             }
           );
 
+          // ── IN-APP AGENTIC ACTION EXECUTION ────────────────────────────────
+          // Parse model response for action commands, execute them, and strip tags
+          const { cleanText } = parseAndExecuteAgentActions(responseText);
+
           // ── ANONYMOUS SERVER-SIDE LOGGING ──────────────────────────────────
-          // Stream finished draining: `responseText` is fully accumulated.
-          // Log the interaction anonymously BEFORE we flip isLoading off.
-          // Wrapped in its own silent try/catch so a failed write can NEVER
-          // break the live chat experience or surface a UI error.
           try {
             await addDoc(collection(db, "anonymous_logs"), {
               question: text.trim(),
-              answer: responseText,
+              answer: cleanText,
               timestamp: serverTimestamp(),
             });
           } catch {
             /* silent: logging failures must not affect the user */
           }
 
-          // Fallback: if the stream produced no chunks (e.g. empty response),
-          // make sure the final text still lands in a message.
+          // Finalize state: ensure the cleaned response text is set
           set((s) => {
+            const msgs = s.messages.slice();
             if (!started) {
               const assistantMsg: ChatMessage = {
                 role: "model",
-                text: responseText,
+                text: cleanText,
                 timestamp: Date.now(),
               };
               return {
@@ -164,7 +169,13 @@ export const useChatStore = create<ChatState>()(
                 isStreaming: false,
               };
             }
+            const last = msgs[msgs.length - 1];
+            msgs[msgs.length - 1] = {
+              ...last,
+              text: cleanText,
+            };
             return {
+              messages: msgs,
               isLoading: false,
               isStreaming: false,
             };
@@ -197,3 +208,34 @@ export const useChatStore = create<ChatState>()(
     }
   )
 );
+
+// ── GLOBAL BRIDGES & EVENT LISTENERS FOR ANDROID / EXTERNAL CONTROLS ────────
+if (typeof window !== "undefined") {
+  (window as any).__rehab_chat_store = useChatStore;
+  (window as any).toggleSpiritualAssistant = () => useChatStore.getState().toggleSidebar();
+  (window as any).openSpiritualAssistant = () => useChatStore.getState().openSidebar();
+  (window as any).closeSpiritualAssistant = () => useChatStore.getState().closeSidebar();
+
+  window.addEventListener("open-spiritual-assistant", () => {
+    useChatStore.getState().openSidebar();
+  });
+
+  window.addEventListener("close-spiritual-assistant", () => {
+    useChatStore.getState().closeSidebar();
+  });
+
+  window.addEventListener("rehab-toggle-assistant", () => {
+    useChatStore.getState().toggleSidebar();
+  });
+
+  // Sync state changes with Android native container
+  useChatStore.subscribe((state) => {
+    try {
+      const bridge = (window as any).AndroidBridge || (window as any).AndroidAudioBridge;
+      if (bridge && typeof bridge.onSpiritualAssistantStateChanged === "function") {
+        bridge.onSpiritualAssistantStateChanged(state.isSidebarOpen);
+      }
+    } catch (_) {}
+  });
+}
+

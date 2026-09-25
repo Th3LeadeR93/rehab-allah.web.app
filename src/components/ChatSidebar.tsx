@@ -7,9 +7,12 @@ import {
   ShieldCheck,
   CircleDot,
   ListOrdered,
+  Mic,
+  MicOff,
   type LucideIcon,
 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { speechService } from "../services/speechService";
 
 // ── SUGGESTED PROMPTS (quick chips shown on an empty conversation) ───────────
 const SUGGESTED_PROMPTS = [
@@ -342,6 +345,10 @@ export default function ChatSidebar() {
   const dismissError = useChatStore((s) => s.dismissError);
 
   const [inputText, setInputText] = useState("");
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -349,6 +356,24 @@ export default function ChatSidebar() {
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // Track dynamic visualViewport height (adjusts seamlessly when mobile keyboard opens/closes)
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const updateViewport = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+        setTimeout(scrollToBottom, 120);
+      }
+    };
+    window.visualViewport.addEventListener("resize", updateViewport);
+    window.visualViewport.addEventListener("scroll", updateViewport);
+    updateViewport();
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("scroll", updateViewport);
+    };
+  }, [scrollToBottom]);
 
   useEffect(() => {
     scrollToBottom();
@@ -358,13 +383,51 @@ export default function ChatSidebar() {
   useEffect(() => {
     if (isSidebarOpen) {
       setTimeout(() => inputRef.current?.focus(), 400);
+    } else if (isListening) {
+      speechService.stop();
+      setIsListening(false);
     }
-  }, [isSidebarOpen]);
+  }, [isSidebarOpen, isListening]);
+
+  // Voice dictation toggle
+  const toggleListening = () => {
+    if (isListening) {
+      speechService.stop();
+      setIsListening(false);
+    } else {
+      setSpeechError(null);
+      const started = speechService.start({
+        onResult: (transcript, isFinal) => {
+          setInputText(transcript);
+          if (isFinal) {
+            if (inputRef.current) {
+              inputRef.current.style.height = "44px";
+              inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 128) + "px";
+            }
+          }
+        },
+        onError: (err) => {
+          setSpeechError(err);
+          setIsListening(false);
+        },
+        onStateChange: (listening) => {
+          setIsListening(listening);
+        },
+      });
+      if (!started) {
+        setIsListening(false);
+      }
+    }
+  };
 
   // Shared sender used by the send button, Enter key, and suggestion chips.
   const submit = async (raw: string) => {
     const text = raw.trim();
     if (!text || isLoading) return;
+    if (isListening) {
+      speechService.stop();
+      setIsListening(false);
+    }
     setInputText("");
     await sendUserMessage(text);
   };
@@ -406,6 +469,7 @@ export default function ChatSidebar() {
           chat-sidebar
           fixed top-0 right-0 bottom-0 z-[85]
           w-full sm:w-[420px] md:w-[460px]
+          h-full max-h-full
           flex flex-col
           bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950
           border-l border-amber-500/10
@@ -413,6 +477,16 @@ export default function ChatSidebar() {
           transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
           ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}
         `}
+        style={
+          viewportHeight
+            ? {
+                height: `${viewportHeight}px`,
+                maxHeight: `${viewportHeight}px`,
+                top: 0,
+                bottom: "auto",
+              }
+            : undefined
+        }
         dir="rtl"
       >
         {/* ── Header ── */}
@@ -522,7 +596,68 @@ export default function ChatSidebar() {
 
         {/* ── Input Area ── */}
         <div className="shrink-0 px-4 py-3 border-t border-amber-500/10 bg-slate-900/95 backdrop-blur-xl">
+          {/* Active Listening Indicator Banner */}
+          {isListening && (
+            <div className="flex items-center justify-between px-3 py-2 mb-2.5 rounded-xl bg-red-500/15 border border-red-500/30 animate-pulse text-xs text-red-200">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <span className="font-medium">🎙️ جارٍ الاستماع... تكلّم الآن باللغة العربية</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  speechService.stop();
+                  setIsListening(false);
+                }}
+                className="text-[11px] font-bold text-red-400 hover:text-red-200 px-2 py-0.5 rounded bg-red-500/20"
+              >
+                إيقاف
+              </button>
+            </div>
+          )}
+
+          {/* Speech Error Banner */}
+          {speechError && (
+            <div className="flex items-center justify-between px-3 py-1.5 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300">
+              <div className="flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>{speechError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSpeechError(null)}
+                className="text-amber-400/80 hover:text-amber-200 text-xs px-1"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="flex items-end gap-2">
+            {/* Mic Voice Dictation button */}
+            <button
+              type="button"
+              onClick={toggleListening}
+              disabled={isLoading}
+              title={isListening ? "إيقاف الاستماع" : "التحدث صوتيًا (إملاء باللغة العربية)"}
+              className={`
+                w-11 h-11 rounded-xl flex items-center justify-center shrink-0
+                transition-all duration-300
+                ${
+                  isListening
+                    ? "bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse scale-105"
+                    : "bg-slate-800/80 border border-amber-500/25 text-amber-400 hover:text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 hover:scale-105 active:scale-95"
+                }
+                ${isLoading ? "opacity-50 cursor-not-allowed" : ""}
+              `}
+            >
+              {isListening ? (
+                <MicOff className="w-5 h-5 animate-bounce" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+
             {/* Textarea */}
             <div className="flex-1 relative">
               <textarea
@@ -530,7 +665,11 @@ export default function ChatSidebar() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="اسأل عن القرآن، الحديث، الفقه..."
+                onFocus={() => {
+                  setTimeout(scrollToBottom, 250);
+                  inputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }}
+                placeholder={isListening ? "جارٍ تحويل صوتك لكلمات..." : "اسأل عن القرآن، الحديث، الفقه..."}
                 rows={1}
                 disabled={isLoading}
                 className="
