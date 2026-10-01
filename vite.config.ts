@@ -16,7 +16,7 @@ export default defineConfig({
     },
   },
   define: {
-    __APP_VERSION__: JSON.stringify("1.5.6"),
+    __APP_VERSION__: JSON.stringify("1.5.7"),
   },
   build: {
     chunkSizeWarningLimit: 600,

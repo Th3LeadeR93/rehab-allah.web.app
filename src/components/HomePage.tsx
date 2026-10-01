@@ -161,10 +161,10 @@ export default function HomePage() {
     <div className="space-y-6 md:space-y-8">
       {/* ── Featured Direct Android APK Download Card ────────────── */}
       <a
-        href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.6/rehab-allah-v1.5.6.apk"
+        href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.7/rehab-allah-v1.5.7.apk"
         target="_blank"
         rel="noopener noreferrer"
-        download="rehab-allah-v1.5.6.apk"
+        download="rehab-allah-v1.5.7.apk"
         className="w-full relative overflow-hidden rounded-2xl transition-all duration-300 group block shadow-lg shadow-black/40"
         aria-label="تحميل تطبيق الأندرويد المباشر (Android APK)"
       >
@@ -188,7 +188,7 @@ export default function HomePage() {
                 تحميل التطبيق المباشر (Android APK)
               </p>
               <p className="text-xs text-slate-400 mt-0.5 font-sans">
-                الإصدار 1.5.6 • حجم 22.2 ميجابايت
+                الإصدار 1.5.7 • حجم 22.2 ميجابايت
               </p>
             </div>
           </div>

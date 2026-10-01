@@ -67,7 +67,7 @@ const SLEEP_TIMEOUT_OPTIONS = [
 
 const DEFAULT_AZKAR_SETTINGS: AzkarBridgeSettings = {
   enabled: true,
-  intervalHours: 3,
+  intervalHours: 1,
   audioEnabled: true,
   nightSilence: true,
   quietHoursStartHour: 23,
@@ -101,7 +101,7 @@ function normalizeAzkarSettings(raw: any): AzkarBridgeSettings {
 
     return {
       enabled: typeof obj.enabled === "boolean" ? obj.enabled : true,
-      intervalHours: typeof obj.intervalHours === "number" ? obj.intervalHours : 3,
+      intervalHours: typeof obj.intervalHours === "number" ? obj.intervalHours : 1,
       audioEnabled: typeof obj.audioEnabled === "boolean" ? obj.audioEnabled : true,
       nightSilence: typeof obj.nightSilence === "boolean" ? obj.nightSilence : true,
       quietHoursStartHour: typeof startH === "number" ? startH : 23,

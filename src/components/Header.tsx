@@ -155,10 +155,10 @@ export default function Header() {
 
             {/* Direct Android APK Download Button */}
             <a
-              href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.6/rehab-allah-v1.5.6.apk"
+              href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.7/rehab-allah-v1.5.7.apk"
               target="_blank"
               rel="noopener noreferrer"
-              download="rehab-allah-v1.5.6.apk"
+              download="rehab-allah-v1.5.7.apk"
               className="group relative flex items-center gap-3 px-4 md:px-5 py-2.5 rounded-2xl bg-[#0d1420]/95 hover:bg-[#121c2e] border border-amber-500/30 hover:border-amber-400 shadow-lg shadow-black/40 hover:shadow-amber-500/10 transition-all duration-300 font-amiri text-right"
               aria-label="تحميل التطبيق المباشر (Android APK)"
             >
@@ -176,7 +176,7 @@ export default function Header() {
                   تحميل التطبيق المباشر (Android APK)
                 </span>
                 <span className="text-[10px] text-slate-400 font-sans mt-0.5">
-                  الإصدار 1.5.6 • حجم 22.2 ميجابايت
+                  الإصدار 1.5.7 • حجم 22.2 ميجابايت
                 </span>
               </div>
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-amber-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
