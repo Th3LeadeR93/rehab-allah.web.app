@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useAppStore, type ActiveTab } from "../store/useAppStore";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { usePrayerStore } from "../store/usePrayerStore";
+import { APP_RELEASE_INFO } from "../data/changelog";
 
 // Beautiful mosque / minaret glyph for the مواقيت الصلاة tab.
 function MosqueIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -77,6 +79,7 @@ export default function Header() {
   const theme = useSettingsStore((s) => s.theme);
   const hijriDateFormatted = usePrayerStore((s) => s.hijriDateFormatted);
   const { timeStr, gregorianDate, hijriDate } = useRealTimeClock();
+  const [showChangelog, setShowChangelog] = useState(false);
 
   // Dynamic text color for light theme
   const dateTextClass = theme === "light" ? "text-slate-600" : "text-slate-400";
@@ -153,34 +156,117 @@ export default function Header() {
               </div>
             </div>
 
-            {/* Direct Android APK Download Button */}
-            <a
-              href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.7/rehab-allah-v1.5.7.apk"
-              target="_blank"
-              rel="noopener noreferrer"
-              download="rehab-allah-v1.5.7.apk"
-              className="group relative flex items-center gap-3 px-4 md:px-5 py-2.5 rounded-2xl bg-[#0d1420]/95 hover:bg-[#121c2e] border border-amber-500/30 hover:border-amber-400 shadow-lg shadow-black/40 hover:shadow-amber-500/10 transition-all duration-300 font-amiri text-right"
-              aria-label="تحميل التطبيق المباشر (Android APK)"
-            >
-              <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-emerald-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.411 13.8564 8 12 8s-3.5902.411-5.1368.9497L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/>
-                </svg>
-                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </span>
+            {/* Direct Android APK Download Button with What's New Dropdown */}
+            <div className="relative">
+              <div className="flex items-center rounded-2xl bg-[#0d1420]/95 border border-amber-500/30 hover:border-amber-400 shadow-lg shadow-black/40 transition-all duration-300 font-amiri">
+                <a
+                  href={APP_RELEASE_INFO.apkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={APP_RELEASE_INFO.apkFileName}
+                  className="group relative flex items-center gap-3 px-3.5 md:px-4 py-2.5 text-right transition-colors"
+                  aria-label="تحميل التطبيق المباشر (Android APK)"
+                >
+                  <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-emerald-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.411 13.8564 8 12 8s-3.5902.411-5.1368.9497L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/>
+                    </svg>
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs md:text-sm font-bold text-amber-400 group-hover:text-amber-300 transition-colors">
+                      تحميل التطبيق المباشر (Android APK)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-sans mt-0.5">
+                      الإصدار {APP_RELEASE_INFO.version} • حجم {APP_RELEASE_INFO.sizeText}
+                    </span>
+                  </div>
+                </a>
+
+                {/* Subtle vertical separator */}
+                <div className="w-px h-8 bg-amber-500/25" />
+
+                {/* Dropdown Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowChangelog(!showChangelog)}
+                  className={`px-2.5 md:px-3 py-3 flex items-center gap-1 text-xs font-bold transition-all select-none rounded-l-2xl ${
+                    showChangelog
+                      ? "text-amber-300 bg-amber-500/20"
+                      : "text-amber-400/90 hover:text-amber-300 hover:bg-white/5"
+                  }`}
+                  aria-label="سجل التغييرات وميزات الإصدار الجديد"
+                  title="عرض سجل التغييرات وميزات التحديث"
+                >
+                  <span className="hidden sm:inline text-[11px]">ما الجديد؟</span>
+                  {showChangelog ? (
+                    <ChevronUp className="w-4 h-4 transition-transform duration-200" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 transition-transform duration-200" />
+                  )}
+                </button>
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs md:text-sm font-bold text-amber-400 group-hover:text-amber-300 transition-colors">
-                  تحميل التطبيق المباشر (Android APK)
-                </span>
-                <span className="text-[10px] text-slate-400 font-sans mt-0.5">
-                  الإصدار 1.5.7 • حجم 22.2 ميجابايت
-                </span>
-              </div>
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-amber-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-            </a>
+
+              {/* Floating Changelog Dropdown Panel */}
+              {showChangelog && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-[420px] max-w-[420px] rounded-2xl border border-amber-500/35 bg-[#0c1322]/98 backdrop-blur-2xl p-4 md:p-5 shadow-2xl shadow-black/90 z-50 animate-fadeIn font-amiri text-right select-none"
+                  dir="rtl"
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-amber-500/20 pb-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🌟</span>
+                      <h4 className="text-sm md:text-base font-bold text-amber-400">
+                        {APP_RELEASE_INFO.releaseTitle}
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowChangelog(false)}
+                      className="text-slate-400 hover:text-amber-400 p-1 rounded-lg hover:bg-white/5 transition-colors"
+                      aria-label="إغلاق"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                    {APP_RELEASE_INFO.highlights.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-amber-500/25 transition-all text-xs"
+                      >
+                        <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-1">
+                          <span>{item.icon}</span>
+                          <span>{item.title}</span>
+                        </div>
+                        <p className="text-slate-300 leading-relaxed pr-5 text-[11px] md:text-xs font-sans">
+                          {item.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-slate-400 font-sans">
+                      الإصدار {APP_RELEASE_INFO.version} (كود {APP_RELEASE_INFO.versionCode})
+                    </span>
+                    <a
+                      href={APP_RELEASE_INFO.apkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={APP_RELEASE_INFO.apkFileName}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5"
+                    >
+                      <span>تحميل APK ({APP_RELEASE_INFO.sizeText})</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tabs */}

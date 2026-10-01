@@ -1,7 +1,9 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAppStore, type Reciter } from "../store/useAppStore";
 import { FAMOUS_RECITERS_ORDERED } from "../data/famousReciters";
 import { ISLAMIC_RADIOS, type RadioStation } from "../data/radios";
+import { APP_RELEASE_INFO } from "../data/changelog";
 import PrayerTimesWidget from "./PrayerTimesWidget";
 
 /* ── Safe Arabic string constants (zero-literal approach) ── */
@@ -94,6 +96,7 @@ export default function HomePage() {
   const isRadioMode = useAppStore((s) => s.isRadioMode);
   const isPlaying = useAppStore((s) => s.isPlaying);
   const queue = useAppStore((s) => s.queue);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -159,21 +162,22 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* ── Featured Direct Android APK Download Card ────────────── */}
-      <a
-        href="https://github.com/Th3LeadeR93/rehab-allah.web.app/releases/download/v1.5.7/rehab-allah-v1.5.7.apk"
-        target="_blank"
-        rel="noopener noreferrer"
-        download="rehab-allah-v1.5.7.apk"
-        className="w-full relative overflow-hidden rounded-2xl transition-all duration-300 group block shadow-lg shadow-black/40"
-        aria-label="تحميل تطبيق الأندرويد المباشر (Android APK)"
-      >
-        <div className="absolute inset-0 bg-[#0d1420]/95 border border-amber-500/30 group-hover:border-amber-400/60 rounded-2xl transition-colors" />
+      {/* ── Featured Direct Android APK Download Card with Accordion ── */}
+      <div className="w-full relative overflow-hidden rounded-2xl transition-all duration-300 shadow-lg shadow-black/40 border border-amber-500/30 bg-[#0d1420]/95 font-amiri">
         <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-emerald-500/10 to-transparent pointer-events-none" />
-        <div className="relative p-4 md:p-5 flex items-center justify-between gap-4">
+
+        {/* Top: Direct Download Link Action */}
+        <a
+          href={APP_RELEASE_INFO.apkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={APP_RELEASE_INFO.apkFileName}
+          className="relative p-4 md:p-5 flex items-center justify-between gap-4 group/download hover:bg-white/[0.02] transition-colors"
+          aria-label="تحميل تطبيق الأندرويد المباشر (Android APK)"
+        >
           <div className="flex items-center gap-3.5 md:gap-4">
             <div className="relative flex items-center justify-center shrink-0">
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-[#121d2f] to-[#0a101b] border border-amber-500/30 flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-[#121d2f] to-[#0a101b] border border-amber-500/30 flex items-center justify-center shadow-inner group-hover/download:scale-105 transition-transform">
                 <svg className="w-7 h-7 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.411 13.8564 8 12 8s-3.5902.411-5.1368.9497L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/>
                 </svg>
@@ -184,22 +188,66 @@ export default function HomePage() {
               </span>
             </div>
             <div className="text-right">
-              <p className="text-base md:text-lg font-bold font-amiri text-amber-400 group-hover:text-amber-300 transition-colors">
+              <p className="text-base md:text-lg font-bold text-amber-400 group-hover/download:text-amber-300 transition-colors">
                 تحميل التطبيق المباشر (Android APK)
               </p>
               <p className="text-xs text-slate-400 mt-0.5 font-sans">
-                الإصدار 1.5.7 • حجم 22.2 ميجابايت
+                الإصدار {APP_RELEASE_INFO.version} • حجم {APP_RELEASE_INFO.sizeText}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-amiri font-semibold group-hover:bg-amber-500/20 group-hover:border-amber-400/40 transition-all shrink-0">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold group-hover/download:bg-amber-500/20 group-hover/download:border-amber-400/40 transition-all shrink-0">
             <span>تحميل مباشر</span>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
           </div>
-        </div>
-      </a>
+        </a>
+
+        {/* Bottom: Accordion Toggle Bar */}
+        <button
+          type="button"
+          onClick={() => setIsChangelogOpen(!isChangelogOpen)}
+          className="w-full px-4 md:px-5 py-2.5 bg-amber-500/5 hover:bg-amber-500/10 border-t border-amber-500/20 flex items-center justify-between text-xs text-amber-300/90 hover:text-amber-300 transition-colors select-none group/accordion"
+          aria-expanded={isChangelogOpen}
+          aria-label="عرض سجل التغييرات وميزات الإصدار"
+        >
+          <div className="flex items-center gap-2 font-bold">
+            <span className="text-amber-400">✨</span>
+            <span>ما الجديد في هذا الإصدار؟ (سجل التغييرات وميزات v{APP_RELEASE_INFO.version})</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] font-sans text-slate-400 group-hover/accordion:text-amber-300 transition-colors">
+            <span>{isChangelogOpen ? "إخفاء التفاصيل" : "عرض التفاصيل"}</span>
+            {isChangelogOpen ? (
+              <ChevronUp className="w-4 h-4 text-amber-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-amber-400" />
+            )}
+          </div>
+        </button>
+
+        {/* Expandable Accordion Content Panel */}
+        {isChangelogOpen && (
+          <div className="p-4 md:p-5 border-t border-amber-500/20 bg-[#090e18]/80 backdrop-blur-xl animate-fadeIn text-right" dir="rtl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {APP_RELEASE_INFO.highlights.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-xl bg-slate-900/70 border border-white/5 hover:border-amber-500/30 transition-all text-xs"
+                >
+                  <div className="flex items-center gap-2 font-bold text-amber-300 mb-1.5">
+                    <span className="text-base">{item.icon}</span>
+                    <span className="text-xs md:text-sm">{item.title}</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pr-6 text-[11px] md:text-xs font-sans">
+                    {item.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Prayer Times Widget ─────────────────────────────────── */}
       <PrayerTimesWidget />
